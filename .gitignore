@@ -1,0 +1,23 @@
+# Virtual environment
+.venv/
+
+# Python cache
+__pycache__/
+
+# IDE settings
+.idea/
+
+# Large dataset (do not commit)
+data/dataset.mat
+
+__pycache__/
+*.py[cod]
+
+# Virtual environment
+.venv/
+
+# IDE settings
+.idea/
+
+# Large dataset (do not commit)
+data/dataset.mat
