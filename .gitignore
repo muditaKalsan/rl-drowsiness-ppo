@@ -21,3 +21,9 @@ __pycache__/
 
 # Large dataset (do not commit)
 data/dataset.mat
+
+__pycache__/
+*.pyc
+models/ckpt_*.zip
+fix_unicode.py
+fix_all_unicode.py
