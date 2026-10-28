@@ -1,9 +1,9 @@
 """
 Train PPO (or A2C) on the DrowsinessEnv.
 Supports:
-  --quick      → short 20k timestep run
+  --quick      -> short 20k timestep run
   --algo {ppo,a2c}
-  --sweep      → train PPO for several WAIT_PENALTY values (0,0.02,0.05,0.1,0.2)
+  --sweep      -> train PPO for several WAIT_PENALTY values (0,-0.02,-0.05,-0.1,-0.2)
     The best model for each penalty is saved under `models/` with a suffix.
 """
 
@@ -26,14 +26,10 @@ from config import (
 from drowsiness_env import DrowsinessEnv
 
 def train_one(penalty, total_timesteps, algo="ppo"):
-    # temporarily set the global WAIT_PENALTY for the env
-    # (the env reads the value at import time, so we monkey‑patch the module variable)
-    import config as cfg
-    cfg.WAIT_PENALTY = penalty
-
-    train_env = lambda: Monitor(DrowsinessEnv(mode="train"))
-    eval_env = lambda: Monitor(DrowsinessEnv(mode="val"))
-
+    # Create environments with the appropriate wait penalty
+    train_env = lambda: Monitor(DrowsinessEnv(mode="train", wait_penalty=penalty))
+    eval_env = lambda: Monitor(DrowsinessEnv(mode="val", wait_penalty=penalty))
+    
     # callbacks
     eval_cb = EvalCallback(
         eval_env(),
@@ -42,6 +38,7 @@ def train_one(penalty, total_timesteps, algo="ppo"):
         eval_freq=2000,
         deterministic=True,
         render=False,
+        n_eval_episodes=200,
     )
     ckpt_cb = CheckpointCallback(save_freq=5000, save_path=MODELS_DIR,
                                  name_prefix=f"ckpt_pen{penalty}")
@@ -53,7 +50,7 @@ def train_one(penalty, total_timesteps, algo="ppo"):
         a2c_params.pop("net_arch", None)
         model = A2C(**a2c_params, env=train_env())
 
-    print(f"[INFO] Training {algo.upper()} with WAIT_PENALTY={penalty} for {total_timesteps:,} steps …")
+    print(f"[INFO] Training {algo.upper()} with WAIT_PENALTY={penalty} for {total_timesteps:,} steps ...")
     model.learn(total_timesteps=total_timesteps, callback=[eval_cb, ckpt_cb])
     # save final model with penalty suffix
     model_path = MODELS_DIR / f"{algo}_pen{penalty}_final.zip"
@@ -74,7 +71,7 @@ def main():
     total_timesteps = QUICK_TIMESTEPS if args.quick else MAX_TIMESTEPS
 
     if args.sweep:
-        penalties = [0.0, 0.02, 0.05, 0.1, 0.2]
+        penalties = [0.0, -0.02, -0.05, -0.1, -0.2]
         for p in penalties:
             train_one(p, total_timesteps, algo=args.algo)
     else:

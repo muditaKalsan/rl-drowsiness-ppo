@@ -17,7 +17,7 @@ from pathlib import Path
 from config import RESULTS_DIR
 
 def _aggregate_first_k(X, k):
-    """Average the first k chunks → shape (samples, features)"""
+    """Average the first k chunks -> shape (samples, features)"""
     return X[:, :k, :].mean(axis=1)
 
 def _train_and_evaluate(clf, X_train, y_train, X_test, y_test, name, k):
@@ -35,8 +35,9 @@ def _train_and_evaluate(clf, X_train, y_train, X_test, y_test, name, k):
 
 def run_baselines():
     splits = get_splits()
-    X_train, y_train = splits["train"]
-    X_test,  y_test  = splits["test"]
+    X_train, y_train = splits["train"][:2]
+    X_val, y_val = splits["val"][:2]
+    X_test, y_test = splits["test"][:2]
 
     results = {}
     for k in (1, 2, 3):

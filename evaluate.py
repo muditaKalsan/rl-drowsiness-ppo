@@ -4,9 +4,9 @@ The script:
 1. Loads the best PPO model for each WAIT_PENALTY (or the single default).
 2. Runs the policy *deterministically* on every test sample once.
 3. Records predictions, correctness, detection delay and the action taken at each step.
-4. Computes accuracy, macro‑F1, confusion matrix, average delay, timeout rate,
-   and per‑subject accuracy.
-5. Saves a CSV/Excel summary and also stores the action‑distribution matrix
+4. Computes accuracy, macro-F1, confusion matrix, average delay, timeout rate,
+   and per-subject accuracy.
+5. Saves a CSV/Excel summary and also stores the action-distribution matrix
    (shape: n_penalties x n_chunks) for later plotting.
 """
 
@@ -17,11 +17,11 @@ import pandas as pd
 from pathlib import Path
 from sklearn.metrics import accuracy_score, f1_score, confusion_matrix
 from stable_baselines3 import PPO, A2C
-from stable_baselines3.common.env_checker import check_env
+from features import get_splits
+
 from config import (
     MODELS_DIR,
     RESULTS_DIR,
-    SCALER_PATH,
     WAIT_PENALTY,
     CHUNK_LENGTH_SECONDS,
 )
@@ -29,24 +29,23 @@ from drowsiness_env import DrowsinessEnv
 from baseline import run_baselines
 
 def _load_model(penalty, algo="ppo"):
-    # The best model saved by EvalCallback has the name "best_model.zip"
-    # when doing a sweep we saved models with suffix _pen{penalty}_final.zip; the best one is also saved with that suffix.
-    # For simplicity we load the *final* model for each penalty.
+    """Load a trained model and pair it with a test environment using the
+    matching *wait_penalty* so the reward bookkeeping is consistent."""
     model_path = MODELS_DIR / f"{algo}_pen{penalty}_final.zip"
     if not model_path.exists():
         raise FileNotFoundError(f"Model not found: {model_path}")
-    env = DrowsinessEnv(mode="test")
+    env = DrowsinessEnv(mode="test", wait_penalty=penalty)
     if algo == "ppo":
-        return PPO.load(str(model_path), env=env)
+        return PPO.load(str(model_path), env=env), env
     else:
-        return A2C.load(str(model_path), env=env)
+        return A2C.load(str(model_path), env=env), env
 
 def evaluate_model(model, env, penalty):
     X_test, y_test, subjects = get_splits()["test"]
     n_samples = X_test.shape[0]
     preds = []
     delays = []
-    # action counts per chunk index (0‑based). We count only "wait" actions; the final action is either alert/drowsy.
+    # action counts per chunk index (0-based). We count only "wait" actions; the final action is either alert/drowsy.
     action_counts = np.zeros(env.n_chunks, dtype=int)
     for i in range(n_samples):
         obs, _ = env.reset()
@@ -89,21 +88,18 @@ def main():
     parser.add_argument("--sweep", action="store_true", help="evaluate all penalties used during sweep")
     args = parser.parse_args()
 
-    # Baselines – they also save confusion matrices to results/ already
-    print("[INFO] Running baselines …")
+    # Baselines - they also save confusion matrices to results/ already
+    print("[INFO] Running baselines ...")
     baseline_metrics = run_baselines()
 
     # RL evaluation
-    print("[INFO] Evaluating RL models …")
+    print("[INFO] Evaluating RL models ...")
     penalties = [WAIT_PENALTY]
     if args.sweep:
-        penalties = [0.0, 0.02, 0.05, 0.1, 0.2]
+        penalties = [0.0, -0.02, -0.05, -0.1, -0.2]
     rl_results = []
     for p in penalties:
-        model = _load_model(p, algo=args.algo)
-        env = DrowsinessEnv(mode="test")
-        # sanity‑check env
-        check_env(env, warn=True)
+        model, env = _load_model(p, algo=args.algo)
         rl_res = evaluate_model(model, env, p)
         rl_results.append(rl_res)
 
@@ -139,7 +135,7 @@ def main():
     xl_path = RESULTS_DIR / "results.xlsx"
     with pd.ExcelWriter(xl_path, engine="openpyxl") as writer:
         df.to_excel(writer, sheet_name="summary", index=False)
-        # per‑subject accuracies for each penalty
+        # per-subject accuracies for each penalty
         for r in rl_results:
             subj_df = pd.DataFrame(list(r["per_subject"].items()), columns=["subject", "accuracy"])
             sheet_name = f"ppo_pen{r['penalty']}_per_subj"

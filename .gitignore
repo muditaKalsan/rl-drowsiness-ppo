@@ -21,3 +21,5 @@ __pycache__/
 
 # Large dataset (do not commit)
 data/dataset.mat
+
+models/ckpt_*.zip

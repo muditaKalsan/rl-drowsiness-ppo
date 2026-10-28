@@ -1,8 +1,8 @@
 """
 Custom Gymnasium environment for the RL drowsiness detection task.
-The environment scales observations using the StandardScaler that was fit
-on the training subjects (saved in `data/scaler.pkl`).
-It also validates itself with `check_env` and runs a quick random‑agent
+The features are already scaled in data_utils.py (StandardScaler fit on
+training subjects 1-7 only), so the environment does NOT scale again.
+It also validates itself with `check_env` and runs a quick random-agent
 sanity check when instantiated with `validate=True`.
 """
 
@@ -14,11 +14,10 @@ from config import (
     WAIT_PENALTY,
     CHUNK_LENGTH_SECONDS,
     FS,
-    SCALER_PATH,
     RANDOM_SEED,
 )
 from features import get_splits
-import joblib
+
 
 class DrowsinessEnv(gym.Env):
     """Gymnasium environment for the RL drowsiness detection task.
@@ -35,26 +34,38 @@ class DrowsinessEnv(gym.Env):
 
     metadata = {"render_modes": []}
 
-    def __init__(self, mode="train", validate=False):
+    def __init__(self, mode="train", wait_penalty=WAIT_PENALTY, validate=False):
+        """Initialize the environment.
+
+        Parameters
+        ----------
+        mode: str
+            'train', 'val', or 'test' - determines data split.
+        wait_penalty: float
+            Penalty applied when the agent chooses the *wait* action.  This value
+            is passed from the training script (or evaluation) so that a sweep
+            over different penalties works correctly.
+        validate: bool
+            If ``True`` the environment runs ``check_env`` and a short random‑
+            policy sanity test.
+        """
         super().__init__()
         self.mode = mode
+        self.wait_penalty = wait_penalty
         self.rng = np.random.default_rng(RANDOM_SEED)
 
         # Load data according to mode
         splits = get_splits()
         if mode == "train":
-            self.X, self.y = splits["train"]
+            self.X, self.y = splits["train"][:2]
         elif mode == "val":
-            self.X, self.y = splits["val"]
+            self.X, self.y = splits["val"][:2]
         elif mode == "test":
-            self.X, self.y = splits["test"]
+            self.X, self.y = splits["test"][:2]
         else:
             raise ValueError("mode must be 'train', 'val' or 'test'")
 
         self.n_samples, self.n_chunks, self.n_features = self.X.shape
-
-        # Load scaler and store for scaling observations
-        self.scaler = joblib.load(SCALER_PATH)
 
         low = np.full(self.n_features * 2 + 1, -np.inf, dtype=np.float32)
         high = np.full(self.n_features * 2 + 1,  np.inf, dtype=np.float32)
@@ -70,10 +81,10 @@ class DrowsinessEnv(gym.Env):
         if validate:
             # sanity‑check the environment
             from stable_baselines3.common.env_checker import check_env
-            print("[INFO] Running env_checker …")
+            print("[INFO] Running env_checker ...")
             check_env(self, warn=True)
             # run a short random‑policy test (10 episodes)
-            print("[INFO] Running quick random‑policy test …")
+            print("[INFO] Running quick random‑policy test ...")
             for _ in range(10):
                 obs, _ = self.reset()
                 done = False
@@ -92,8 +103,7 @@ class DrowsinessEnv(gym.Env):
 
     def _current_obs(self):
         newest = self.X[self.current_idx, self.current_chunk]
-        # scale the raw features
-        newest = self.scaler.transform(newest.reshape(1, -1)).ravel()
+        # accumulate running mean of all revealed chunks (features already scaled)
         self.cum_sum += newest
         mean = self.cum_sum / (self.current_chunk + 1)
         elapsed = (self.current_chunk + 1) / self.n_chunks
@@ -121,7 +131,7 @@ class DrowsinessEnv(gym.Env):
         true_label = int(self.y[self.current_idx])
 
         if action == 2:  # WAIT
-            reward = WAIT_PENALTY
+            reward = self.wait_penalty
             if self.current_chunk == self.n_chunks - 1:
                 # timeout
                 terminated = True

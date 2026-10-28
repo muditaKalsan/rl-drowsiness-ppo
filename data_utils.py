@@ -64,7 +64,7 @@ def _detect_drowsy_label(labels: np.ndarray, eeg: np.ndarray) -> int:
     avg0 = ratios[labels == 0].mean()
     avg1 = ratios[labels == 1].mean()
     drowsy = 0 if avg0 > avg1 else 1
-    print(f"[INFO] Detected drowsy label = {drowsy} (higher (θ+α)/β ratio)")
+    print(f"[INFO] Detected drowsy label = {drowsy} (higher (theta+alpha)/beta ratio)")
     return drowsy
 
 def _extract_features(eeg: np.ndarray) -> np.ndarray:
@@ -98,16 +98,16 @@ def prepare_and_cache():
             f"Dataset not found: {MAT_FILE}\n"
             "Please download the Figshare file and place it in the `data/` folder."
         )
-    print("[INFO] Loading .mat file …")
+    print("[INFO] Loading .mat file ...")
     mat = _load_mat()
     eeg = mat["EEGsample"]
     labels = mat["substate"]
     subjects = mat["subindex"]
 
-    # Detect drowsy label (just for printing – not used later)
+    # Detect drowsy label (just for printing - not used later)
     _ = _detect_drowsy_label(labels, eeg)
 
-    print("[INFO] Extracting band‑power features …")
+    print("[INFO] Extracting band‑power features ...")
     feats = _extract_features(eeg)  # (samples, chunks, 120)
 
     # Split to train subjects for scaler fitting
@@ -117,7 +117,7 @@ def prepare_and_cache():
     scaler.fit(X_train.reshape(-1, X_train.shape[-1]))
     joblib.dump(scaler, SCALER_PATH)
 
-    print("[INFO] Scaling all features …")
+    print("[INFO] Scaling all features ...")
     feats_scaled = scaler.transform(feats.reshape(-1, feats.shape[-1])).reshape(feats.shape)
 
     # Cache to disk

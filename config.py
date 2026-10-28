@@ -24,7 +24,7 @@ SUBJECTS_PATH = DATA_DIR / "subjects.npy"
 # Dataset handling
 # ----------------------------------------------------------------------
 MAT_FILE = DATA_DIR / "dataset.mat"          # **do NOT** commit this file
-CHUNK_LENGTH_SECONDS = 1.0                   # can be changed to 0.5, 2, …
+CHUNK_LENGTH_SECONDS = 1.0                   # can be changed to 0.5, 2, ...
 FS = 128                                      # sampling frequency (Hz)
 POINTS_PER_CHUNK = int(FS * CHUNK_LENGTH_SECONDS)
 
@@ -49,6 +49,6 @@ PPO_PARAMS = {
     "learning_rate": 3e-4,
     "gamma": 0.99,
     "ent_coef": 0.01,
-    "net_arch": [128, 128],
+    "policy_kwargs": dict(net_arch=[128, 128]),
     "seed": RANDOM_SEED,
 }
